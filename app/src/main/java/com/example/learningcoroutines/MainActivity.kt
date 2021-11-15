@@ -1,81 +1,58 @@
 package com.example.learningcoroutines
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.os.ProxyFileDescriptorCallback
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import com.example.learningcoroutines.databinding.ActivityMainBinding
-import kotlin.concurrent.thread
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private val binding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
     }
-//работать с view элементами можно только на главном потоке. Чтобы из других потоков вызвать
-//какой то код на главном потоке, используется класс Handler
-//Handler ипользует очередь сообщений из класса Looper. При создании обьекта Handler ему нужно
-// передать Looper в качестве параметра Handler(Looper.getMainLooper()) если события нужно
-// обрабатывать на главном потоке
-//Если события нужно обрабатывать не на главном потоке то перед созданием обьекта Handler нужно
-// вызвать метод Looper.prepare() после чего в Handler в качестве параметра передать Handler(Looper.myLooper())
-
-
-    //для того чтобы разные потоки могли общаться и передавать друг другу данные, существует Handler
-    //обьект этого класса можно создать на главном потоке, затем из любого потока ему можно передавать
-    //обьекты Runnable, и тогда метод Run будет вызван на главном потоке
-    private val handler = Handler(Looper.getMainLooper())
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
         binding.buttonLoad.setOnClickListener {
-            loadData()
+            //таким способом асинхронный код будет иметь жизненный цикл, т.е запрос отменится если активити умрет, поэтому корутина запускается внутри lifecycleScope
+            lifecycleScope.launch {
+                loadData()
+            }
         }
     }
-
-    private fun loadData() {
+    //Использование корутин это программирование с колбэками, они не видны, их создает компилятор
+    //Suspend функции не должны блокировать поток
+    //Suspend функции под капотом используют State машину чтобы один и тот же метод можно было
+    // вызывать с разными состояниями
+    //Suspend функции можно запустить только из других Suspend функций, или из корутины
+    private suspend fun loadData() {
         binding.progress.isVisible = true
         binding.buttonLoad.isEnabled = false
-        loadCity { it ->
-            binding.tvLocation.text = it
-            loadTemperature(it){
-                binding.tvTemperature.text = it.toString()
-                binding.progress.isVisible = false
-                binding.buttonLoad.isEnabled = true
-            }
-
-        }
+        val city = loadCity()
+        binding.tvLocation.text = city
+        val temperature = loadTemperature(city)
+        binding.tvTemperature.text = temperature.toString()
+        binding.progress.isVisible = false
+        binding.buttonLoad.isEnabled = true
     }
 
-    private fun loadCity(callback:(String) -> Unit){
-        thread {//создается новый поток
-            Thread.sleep(5000) //поток засыпает на 5 секунд, после будет вызван метод колбэка
-            // на главном потоке, т.к хэндлер был создан на нем
-            handler.post {  //метод post вызовет метод run мгновенно, а если необходимо установить
-  // задержку перед вызовом, нужно вызвать postDelayed в котором указать задержку в микросекундах
-                callback.invoke("Moscow")
-            }
-        }
+    private suspend fun loadCity(): String {
+        delay(5000) //при использовании suspend функций, функция приостановит свое
+        //выполнение на 5 секунд, таким образом главный поток не будет заблокирован на это время.
+      // По истечении заданного времени функция вернется к выполнению с следующей строки
+        return "Moscow"
     }
 
-    private fun loadTemperature(city: String, callback: (Int) -> Unit){
-        thread {
-    //можно использовать такой вызов, "запусти на главном потоке", под капотом используется тот же хэндлер
-            runOnUiThread{
-                Toast.makeText(
-                    this,
-                    getString(R.string.loading_temperature_toast, city),
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-            Thread.sleep(5000)
-            runOnUiThread {
-                callback.invoke(17)
-            }
-        }
-
+    private suspend fun loadTemperature(city: String): Int {
+        Toast.makeText(
+            this,
+            getString(R.string.loading_temperature_toast, city),
+            Toast.LENGTH_SHORT
+        ).show()
+        delay(5000)
+        return 17
     }
 }
