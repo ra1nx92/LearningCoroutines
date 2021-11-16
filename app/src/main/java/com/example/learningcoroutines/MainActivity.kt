@@ -27,7 +27,7 @@ class MainActivity : AppCompatActivity() {
     //Suspend функции не должны блокировать поток
     //Suspend функции под капотом используют State машину чтобы один и тот же метод можно было
     // вызывать с разными состояниями
-    //Suspend функции можно запустить только из других Suspend функций, или из корутины
+    //Suspend функции можно запустить только из других Suspend функций, или из корутин скоупа
     private suspend fun loadData() {
         binding.progress.isVisible = true
         binding.buttonLoad.isEnabled = false
